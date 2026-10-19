@@ -1,1 +1,203 @@
+-- 1.1 Customers, orders, couriers and payments
+SELECT
+    c.full_name AS customer_name,
+    o.order_id,
+    o.status,
+    cr.full_name AS courier_name,
+    p.amount,
+    p.payment_status
+FROM customers c
+JOIN orders o ON c.customer_id = o.customer_id
+LEFT JOIN couriers cr ON o.courier_id = cr.courier_id
+LEFT JOIN payments p ON o.order_id = p.order_id;
+
+
+-- 1.2 Orders and their products
+SELECT
+    o.order_id,
+    c.full_name AS customer_name,
+    oi.product_name,
+    oi.quantity,
+    oi.price,
+    oi.quantity * oi.price AS item_total
+FROM orders o
+JOIN customers c ON o.customer_id = c.customer_id
+JOIN order_items oi ON o.order_id = oi.order_id
+ORDER BY o.order_id;
+
+
+-- 1.3 Courier workload
+SELECT
+    cr.courier_id,
+    cr.full_name AS courier_name,
+    COUNT(o.order_id) AS order_count,
+    COALESCE(SUM(o.total_amount), 0) AS total_order_amount
+FROM couriers cr
+LEFT JOIN orders o ON cr.courier_id = o.courier_id
+GROUP BY cr.courier_id, cr.full_name
+ORDER BY order_count DESC;
+
+
+-- =====================================================
+-- 2. SINGLE-ROW AND SINGLE-COLUMN SUBQUERIES
+-- =====================================================
+
+-- 2.1 Orders above the average amount
+SELECT order_id, customer_id, total_amount
+FROM orders
+WHERE total_amount > (
+    SELECT AVG(total_amount)
+    FROM orders
+);
+
+
+-- 2.2 Payment with the maximum amount
+SELECT payment_id, order_id, amount, payment_method
+FROM payments
+WHERE amount = (
+    SELECT MAX(amount)
+    FROM payments
+);
+
+
+-- 2.3 Customer with the most expensive order
+SELECT
+    c.full_name AS customer_name,
+    o.order_id,
+    o.total_amount
+FROM customers c
+JOIN orders o ON c.customer_id = o.customer_id
+WHERE o.total_amount = (
+    SELECT MAX(total_amount)
+    FROM orders
+);
+
+
+-- =====================================================
+-- 3. MULTI-ROW SUBQUERIES
+-- =====================================================
+
+-- 3.1 Customers who have placed orders
+SELECT customer_id, full_name, phone
+FROM customers
+WHERE customer_id IN (
+    SELECT customer_id
+    FROM orders
+);
+
+
+-- 3.2 Couriers who have assigned orders
+SELECT courier_id, full_name, phone
+FROM couriers
+WHERE courier_id IN (
+    SELECT courier_id
+    FROM orders
+    WHERE courier_id IS NOT NULL
+);
+
+
+-- 3.3 Customers whose average order is above the overall average
+SELECT
+    c.customer_id,
+    c.full_name,
+    AVG(o.total_amount) AS customer_average
+FROM customers c
+JOIN orders o ON c.customer_id = o.customer_id
+GROUP BY c.customer_id, c.full_name
+HAVING AVG(o.total_amount) > (
+    SELECT AVG(total_amount)
+    FROM orders
+);
+
+
+-- =====================================================
+-- 4. CASE: CONDITIONAL VALUES
+-- =====================================================
+
+-- 4.1 Classify orders by amount
+SELECT
+    order_id,
+    total_amount,
+    CASE
+        WHEN total_amount >= 5000 THEN 'Expensive'
+        WHEN total_amount >= 3000 THEN 'Medium'
+        ELSE 'Low'
+    END AS order_category
+FROM orders;
+
+
+-- 4.2 Payment status descriptions
+SELECT
+    payment_id,
+    order_id,
+    amount,
+    payment_status,
+    CASE
+        WHEN payment_status = 'Оплачено' THEN 'Paid'
+        WHEN payment_status = 'Күтілуде' THEN 'Awaiting payment'
+        ELSE 'Other status'
+    END AS payment_description
+FROM payments;
+
+
+-- 4.3 Courier workload categories
+SELECT
+    cr.courier_id,
+    cr.full_name,
+    COUNT(o.order_id) AS order_count,
+    CASE
+        WHEN COUNT(o.order_id) >= 5 THEN 'High workload'
+        WHEN COUNT(o.order_id) >= 1 THEN 'Has assigned orders'
+        ELSE 'No assigned orders'
+    END AS workload_category
+FROM couriers cr
+LEFT JOIN orders o ON cr.courier_id = o.courier_id
+GROUP BY cr.courier_id, cr.full_name;
+
+
+-- =====================================================
+-- 5. COMPLEX ANALYTICAL QUERIES
+-- =====================================================
+
+-- 5.1 Customer order statistics
+SELECT
+    c.customer_id,
+    c.full_name,
+    COUNT(o.order_id) AS order_count,
+    COALESCE(SUM(o.total_amount), 0) AS total_spent,
+    COALESCE(AVG(o.total_amount), 0) AS average_order_amount
+FROM customers c
+LEFT JOIN orders o ON c.customer_id = o.customer_id
+GROUP BY c.customer_id, c.full_name
+ORDER BY total_spent DESC;
+
+
+-- 5.2 Product sales analysis
+SELECT
+    oi.product_name,
+    SUM(oi.quantity) AS units_sold,
+    SUM(oi.quantity * oi.price) AS sales_amount,
+    COUNT(DISTINCT oi.order_id) AS order_count
+FROM order_items oi
+GROUP BY oi.product_name
+HAVING SUM(oi.quantity) > 0
+ORDER BY sales_amount DESC;
+
+
+-- 5.3 Order ranking and percentage of total
+SELECT
+    order_id,
+    customer_id,
+    total_amount,
+    RANK() OVER (
+        ORDER BY total_amount DESC
+    ) AS order_rank,
+    SUM(total_amount) OVER () AS all_orders_total,
+    ROUND(
+        100.0 * total_amount /
+        NULLIF(SUM(total_amount) OVER (), 0),
+        2
+    ) AS percentage_of_total
+FROM orders
+ORDER BY order_rank;
 
