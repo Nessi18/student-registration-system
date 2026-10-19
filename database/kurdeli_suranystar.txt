@@ -1,4 +1,13 @@
+-- 1. JOIN: MULTIPLE TABLES
+-- =====================================================
+
 -- 1.1 Customers, orders, couriers and payments
+-- Тапсырыс беруші, тапсырыс, курьер және төлем туралы ақпаратты біріктіреді.
+-- JOIN тапсырыс берушіні тапсырыспен байланыстырады.
+-- LEFT JOIN курьер немесе төлем туралы мәлімет болмаса да,
+-- тапсырыс туралы ақпаратты көрсетуге мүмкіндік береді.
+-- Нәтиже: клиенттің аты, тапсырыс нөмірі, статусы,
+-- курьердің аты және төлем туралы ақпарат.
 SELECT
     c.full_name AS customer_name,
     o.order_id,
@@ -11,8 +20,12 @@ JOIN orders o ON c.customer_id = o.customer_id
 LEFT JOIN couriers cr ON o.courier_id = cr.courier_id
 LEFT JOIN payments p ON o.order_id = p.order_id;
 
-
 -- 1.2 Orders and their products
+-- Әр тапсырыстағы өнімдер туралы ақпаратты көрсетеді.
+-- JOIN арқылы orders, customers және order_items кестелері біріктіріледі.
+-- quantity * price арқылы өнімнің жалпы құны есептеледі.
+-- AS item_total есептелген бағанға атау береді.
+-- ORDER BY o.order_id нәтижені тапсырыс нөмірі бойынша реттейді.
 SELECT
     o.order_id,
     c.full_name AS customer_name,
@@ -25,8 +38,13 @@ JOIN customers c ON o.customer_id = c.customer_id
 JOIN order_items oi ON o.order_id = oi.order_id
 ORDER BY o.order_id;
 
-
 -- 1.3 Courier workload
+-- Әр курьерге тиесілі тапсырыстар санын және олардың жалпы сомасын есептейді.
+-- LEFT JOIN тапсырысы жоқ курьерлерді де нәтижеде сақтайды.
+-- COUNT тапсырыстар санын, SUM олардың сомасын есептейді.
+-- COALESCE бос мәнді 0-ге ауыстырады.
+-- GROUP BY әр курьер бойынша жеке есеп жүргізеді.
+-- ORDER BY order_count DESC тапсырысы көп курьерді бірінші көрсетеді.
 SELECT
     cr.courier_id,
     cr.full_name AS courier_name,
@@ -36,13 +54,14 @@ FROM couriers cr
 LEFT JOIN orders o ON cr.courier_id = o.courier_id
 GROUP BY cr.courier_id, cr.full_name
 ORDER BY order_count DESC;
-
-
--- =====================================================
 -- 2. SINGLE-ROW AND SINGLE-COLUMN SUBQUERIES
 -- =====================================================
 
 -- 2.1 Orders above the average amount
+-- Орташа тапсырыс сомасынан қымбат тапсырыстарды табады.
+-- Ішкі сұраныста AVG(total_amount) барлық тапсырыстың орташа сомасын есептейді.
+-- Сыртқы сұраныс WHERE арқылы орташа мәннен үлкен тапсырыстарды таңдайды.
+-- AVG орташа арифметикалық мәнді есептейді.
 SELECT order_id, customer_id, total_amount
 FROM orders
 WHERE total_amount > (
@@ -52,6 +71,10 @@ WHERE total_amount > (
 
 
 -- 2.2 Payment with the maximum amount
+-- Ең үлкен төлем сомасына тең төлемдерді табады.
+-- Ішкі сұраныста MAX(amount) ең үлкен төлемді анықтайды.
+-- Сыртқы сұраныс сол сомаға тең төлем туралы ақпаратты көрсетеді.
+-- Егер бірнеше төлемнің сомасы бірдей ең үлкен болса, олардың барлығы шығады.
 SELECT payment_id, order_id, amount, payment_method
 FROM payments
 WHERE amount = (
@@ -61,6 +84,10 @@ WHERE amount = (
 
 
 -- 2.3 Customer with the most expensive order
+-- Ең қымбат тапсырысты жасаған клиентті анықтайды.
+-- JOIN клиент туралы ақпаратты тапсырыспен байланыстырады.
+-- Ішкі сұраныста MAX(total_amount) ең үлкен тапсырыс сомасын табады.
+-- WHERE сыртқы сұранысты осы сомаға тең тапсырыстармен шектейді.
 SELECT
     c.full_name AS customer_name,
     o.order_id,
@@ -72,12 +99,13 @@ WHERE o.total_amount = (
     FROM orders
 );
 
-
--- =====================================================
--- 3. MULTI-ROW SUBQUERIES
+ 3. MULTI-ROW SUBQUERIES
 -- =====================================================
 
 -- 3.1 Customers who have placed orders
+-- Кемінде бір тапсырыс жасаған клиенттерді табады.
+-- Ішкі сұраныс orders кестесінен клиенттердің ID мәндерін алады.
+-- IN клиенттің ID мәні сол тізімде бар-жоғын тексереді.
 SELECT customer_id, full_name, phone
 FROM customers
 WHERE customer_id IN (
@@ -87,6 +115,10 @@ WHERE customer_id IN (
 
 
 -- 3.2 Couriers who have assigned orders
+-- Кемінде бір тапсырысы бар курьерлерді анықтайды.
+-- Ішкі сұраныс тапсырыстарға бекітілген курьерлердің ID мәндерін алады.
+-- IN курьердің ID мәнін осы тізіммен салыстырады.
+-- IS NOT NULL курьер ID-і бос емес жазбаларды ғана таңдайды.
 SELECT courier_id, full_name, phone
 FROM couriers
 WHERE courier_id IN (
@@ -97,6 +129,12 @@ WHERE courier_id IN (
 
 
 -- 3.3 Customers whose average order is above the overall average
+-- Орташа тапсырыс сомасы жалпы орташа мәннен жоғары клиенттерді табады.
+-- AVG әр клиенттің орташа тапсырыс сомасын есептейді.
+-- GROUP BY есептеуді әр клиент бойынша бөледі.
+-- HAVING топтастыру нәтижесіне шарт қояды.
+-- Ішкі сұраныс барлық тапсырыстардың орташа сомасын есептейді.
+-- WHERE жеке жолдарды, ал HAVING топтастырылған нәтижелерді сүзеді.
 SELECT
     c.customer_id,
     c.full_name,
@@ -109,12 +147,14 @@ HAVING AVG(o.total_amount) > (
     FROM orders
 );
 
-
--- =====================================================
--- 4. CASE: CONDITIONAL VALUES
+ 4. CASE: CONDITIONAL VALUES
 -- =====================================================
 
 -- 4.1 Classify orders by amount
+-- Тапсырыстарды сомасына қарай үш санатқа бөледі.
+-- 5000 және одан жоғары — Expensive; 3000 және одан жоғары — Medium;
+-- қалғандары — Low.
+-- CASE шарттарды ретімен тексереді, ELSE басқа жағдайларды қамтиды.
 SELECT
     order_id,
     total_amount,
@@ -127,6 +167,10 @@ FROM orders;
 
 
 -- 4.2 Payment status descriptions
+-- Төлем статустарын түсінікті сипаттамаларға айналдырады.
+-- Оплачено болса — Paid, Күтілуде болса — Awaiting payment.
+-- Басқа мәндер үшін Other status көрсетіледі.
+-- Бұл сұраныс бастапқы статусты өзгертпейді, тек қосымша баған шығарады.
 SELECT
     payment_id,
     order_id,
@@ -141,6 +185,12 @@ FROM payments;
 
 
 -- 4.3 Courier workload categories
+-- Курьерлерді тапсырыстарының саны бойынша санаттарға бөледі.
+-- COUNT әр курьердің тапсырыстарын санайды.
+-- 5 немесе одан көп болса High workload;
+-- кемінде біреуі болса Has assigned orders;
+-- тапсырысы болмаса No assigned orders көрсетіледі.
+-- LEFT JOIN тапсырысы жоқ курьерлерді де сақтайды.
 SELECT
     cr.courier_id,
     cr.full_name,
@@ -153,13 +203,13 @@ SELECT
 FROM couriers cr
 LEFT JOIN orders o ON cr.courier_id = o.courier_id
 GROUP BY cr.courier_id, cr.full_name;
-
-
--- =====================================================
--- 5. COMPLEX ANALYTICAL QUERIES
--- =====================================================
-
--- 5.1 Customer order statistics
+ 5.1 Customer order statistics
+-- Әр клиенттің тапсырыстар статистикасын есептейді.
+-- COUNT тапсырыстар санын, SUM жалпы жұмсалған соманы,
+-- AVG орташа тапсырыс сомасын көрсетеді.
+-- COALESCE бос мәнді 0-ге ауыстырады.
+-- GROUP BY әр клиент бойынша статистика жасайды.
+-- ORDER BY total_spent DESC жалпы шығын бойынша кему ретімен сұрыптайды.
 SELECT
     c.customer_id,
     c.full_name,
@@ -173,6 +223,13 @@ ORDER BY total_spent DESC;
 
 
 -- 5.2 Product sales analysis
+-- Әр өнім бойынша сатылған бірліктер санын және сатылым сомасын есептейді.
+-- SUM(quantity) сатылған өнімдердің жалпы санын көрсетеді.
+-- SUM(quantity * price) жалпы сатылым сомасын есептейді.
+-- COUNT(DISTINCT order_id) өнім кездескен әртүрлі тапсырыстарды санайды.
+-- GROUP BY есептеуді әр өнім бойынша бөледі.
+-- HAVING тек сатылған саны нөлден көп өнімдерді қалдырады.
+-- ORDER BY sales_amount DESC сатылым сомасын кему ретімен сұрыптайды.
 SELECT
     oi.product_name,
     SUM(oi.quantity) AS units_sold,
@@ -185,6 +242,14 @@ ORDER BY sales_amount DESC;
 
 
 -- 5.3 Order ranking and percentage of total
+-- Тапсырыстарды сомасы бойынша рейтингке бөледі және жалпы сомадағы үлесін есептейді.
+-- RANK() тапсырыстарды сомасы бойынша кему ретімен ранжирлейді.
+-- SUM(total_amount) OVER () барлық тапсырыстың жалпы сомасын есептейді.
+-- OVER () терезелік функцияның барлық жолды қарастыратынын білдіреді.
+-- ROUND(..., 2) пайыздық үлесті екі ондық таңбаға дейін дөңгелектейді.
+-- NULLIF(..., 0) бөлім нөл болған жағдайда нөлге бөлінуді болдырмайды.
+-- percentage_of_total әр тапсырыстың жалпы сомадағы пайызын көрсетеді.
+-- ORDER BY order_rank нәтижені рейтинг бойынша реттейді.
 SELECT
     order_id,
     customer_id,
@@ -197,7 +262,3 @@ SELECT
         100.0 * total_amount /
         NULLIF(SUM(total_amount) OVER (), 0),
         2
-    ) AS percentage_of_total
-FROM orders
-ORDER BY order_rank;
-
